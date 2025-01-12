@@ -53,8 +53,26 @@ function App() {
     // Define scene boundaries
     const BOUNDARY = 20;
 
-    // Minimum velocity to maintain movement
+    // Velocity constraints
     const MIN_VELOCITY = 0.005;
+    const MAX_VELOCITY = 0.2; // Maximum speed limit
+
+    // Minimum spawn distance from existing cubes
+    const MIN_SPAWN_DISTANCE = 2; // Adjust as needed
+
+    // Maximum attempts to find a valid spawn position
+    const MAX_SPAWN_ATTEMPTS = 10;
+
+    // Helper function to check if the spawn position is valid
+    const isPositionValid = (position, boxes, minDistance) => {
+      for (let box of boxes) {
+        const distance = new THREE.Vector3(...position).distanceTo(box.mesh.position);
+        if (distance < minDistance + box.mesh.geometry.parameters.width / 2) {
+          return false;
+        }
+      }
+      return true;
+    };
 
     // Box class to manage properties
     class Box {
@@ -77,9 +95,9 @@ function App() {
         this.rotationAxis = axes[Math.floor(Math.random() * axes.length)];
         this.rotationSpeed = Math.random() * 0.005 + 0.001; // Slower rotation
 
-        // Assign velocity
+        // Assign velocity with speed limit
         if (velocity) {
-          this.velocity = velocity;
+          this.velocity = this.limitVelocity(velocity);
         } else {
           // Random initial velocity
           this.velocity = new THREE.Vector3(
@@ -87,14 +105,26 @@ function App() {
             (Math.random() - 0.5) * 0.02,
             (Math.random() - 0.5) * 0.02
           );
+          this.velocity = this.limitVelocity(this.velocity);
         }
+      }
+
+      // Method to limit velocity
+      limitVelocity(velocity) {
+        const speed = velocity.length();
+        if (speed > MAX_VELOCITY) {
+          return velocity.normalize().multiplyScalar(MAX_VELOCITY);
+        }
+        return velocity;
       }
 
       update() {
         // Move the cube
         this.mesh.position.add(this.velocity);
 
-        // Ensure minimum velocity
+        // Ensure minimum velocity and limit maximum velocity
+        this.velocity = this.limitVelocity(this.velocity);
+
         ['x', 'y', 'z'].forEach((axis) => {
           if (Math.abs(this.velocity[axis]) < MIN_VELOCITY) {
             this.velocity[axis] = this.velocity[axis] < 0 ? -MIN_VELOCITY : MIN_VELOCITY;
@@ -114,9 +144,9 @@ function App() {
       }
     }
 
-    // Initialize boxes
+    // Initialize boxes with larger size
     const boxes = [
-      new Box(2, [0, 0, 0], 0)
+      new Box(3, [0, 0, 0], 0) // Increased initial size to 3
     ];
 
     // Click handler
@@ -134,16 +164,14 @@ function App() {
       if (intersects.length > 0) {
         const clickedMesh = intersects[0].object;
         const clickedBox = clickedMesh.userData;
-        console.log('Box clicked:', clickedBox);
 
         if (clickedBox.level < 4) { // Increased levels (0-4)
           // Flash yellow
           clickedBox.flashColor(0xFFFF00);
 
-          // Split the box into 3 to 6 smaller boxes
           const spawnCount = Math.floor(Math.random() * 4) + 3; // 3 to 6
-          const newSize = clickedBox.mesh.geometry.parameters.width * 0.6; // Slightly larger spawned cubes
-          const offset = newSize * 1.5; // Spacing for better visibility
+          const newSize = clickedBox.mesh.geometry.parameters.width * 0.65; // Increased spawn size
+          const offset = newSize * 1.5;
           const newLevel = clickedBox.level + 1;
 
           // Generate random directions for spawning
@@ -156,19 +184,36 @@ function App() {
               Math.cos(phi)
             ).normalize();
 
-            const spawnDistance = offset + Math.random() * offset; // Random spawn distance
-            const newPos = clickedBox.mesh.position.clone().add(direction.clone().multiplyScalar(spawnDistance));
+            const spawnDistance = offset + Math.random() * offset;
+            let newPos = clickedBox.mesh.position.clone().add(
+              direction.clone().multiplyScalar(spawnDistance)
+            );
 
-            // Randomize spawn velocity
-            const initialSpeed = 0.05 + Math.random() * 0.05;
-            const initialVelocity = direction.clone().multiplyScalar(initialSpeed);
+            // Check for proximity and adjust if necessary
+            let attempts = 0;
+            while (!isPositionValid([newPos.x, newPos.y, newPos.z], boxes, MIN_SPAWN_DISTANCE) && attempts < MAX_SPAWN_ATTEMPTS) {
+              // Slightly adjust the position
+              newPos = clickedBox.mesh.position.clone().add(
+                new THREE.Vector3(
+                  (Math.random() - 0.5) * 2,
+                  (Math.random() - 0.5) * 2,
+                  (Math.random() - 0.5) * 2
+                ).normalize().multiplyScalar(spawnDistance)
+              );
+              attempts++;
+            }
 
-            const newBox = new Box(newSize, [newPos.x, newPos.y, newPos.z], newLevel, initialVelocity);
-
-            // Flash yellow on creation
-            newBox.flashColor(0xFFFF00);
-
-            boxes.push(newBox);
+            // If a valid position is found, spawn the cube
+            if (isPositionValid([newPos.x, newPos.y, newPos.z], boxes, MIN_SPAWN_DISTANCE)) {
+              // Randomize spawn velocity with speed limit
+              const initialSpeed = 0.05 + Math.random() * 0.15; // Adjusted speed range
+              const initialVelocity = direction.clone().multiplyScalar(initialSpeed);
+              const newBox = new Box(newSize, [newPos.x, newPos.y, newPos.z], newLevel, initialVelocity);
+              newBox.flashColor(0xFFFF00);
+              boxes.push(newBox);
+            } else {
+              console.warn('Could not find a valid spawn position after maximum attempts.');
+            }
           }
 
           // Remove the clicked box
@@ -201,20 +246,16 @@ function App() {
           const minDistance = (boxA.mesh.geometry.parameters.width + boxB.mesh.geometry.parameters.width) / 2;
 
           if (distance < minDistance) {
-            // Calculate normal vector
             const normal = boxA.mesh.position.clone().sub(boxB.mesh.position).normalize();
-
-            // Calculate relative velocity
             const relativeVelocity = boxA.velocity.clone().sub(boxB.velocity);
             const speed = relativeVelocity.dot(normal);
 
             if (speed < 0) continue; // Prevent double collision
 
-            // Elastic collision response
             const impulse = normal.clone().multiplyScalar(speed * 1.05); // Slightly increase speed to avoid sticking
 
-            boxA.velocity.sub(impulse);
-            boxB.velocity.add(impulse);
+            boxA.velocity = boxA.limitVelocity(boxA.velocity.sub(impulse));
+            boxB.velocity = boxB.limitVelocity(boxB.velocity.add(impulse));
           }
         }
       }
@@ -226,10 +267,12 @@ function App() {
           if (box.mesh.position[axis] + halfSize > BOUNDARY) {
             box.mesh.position[axis] = BOUNDARY - halfSize;
             box.velocity[axis] *= -1;
+            box.velocity = box.limitVelocity(box.velocity);
           }
           if (box.mesh.position[axis] - halfSize < -BOUNDARY) {
             box.mesh.position[axis] = -BOUNDARY + halfSize;
             box.velocity[axis] *= -1;
+            box.velocity = box.limitVelocity(box.velocity);
           }
         });
       });
