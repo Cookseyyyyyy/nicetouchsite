@@ -1,0 +1,72 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body, html, #root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: 'Poppins', sans-serif;
+}
+
+#mount {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.title {
+  color: #FFFF00;
+  font-size: 4rem;
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-bottom: 2rem;
+  pointer-events: none;
+}
+
+.letter {
+  display: inline-block;
+  transition: transform 0.3s ease;
+  cursor: default;
+}
+
+.buttons {
+  position: absolute;
+  bottom: 20px;
+  display: flex;
+  gap: 10px;
+  pointer-events: auto;
+}
+
+button {
+  background-color: transparent;
+  border: 2px solid #FFFF00;
+  color: #FFFF00;
+  padding: 12px 24px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+button:hover {
+  background-color: #FFFF00;
+  color: black;
+}
