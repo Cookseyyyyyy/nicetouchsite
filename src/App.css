@@ -34,7 +34,7 @@ body, html, #root {
 
 .title {
   color: #FFFF00;
-  font-size: 4rem;
+  font-size: 8rem;
   display: flex;
   gap: 0.5rem;
   justify-content: center;

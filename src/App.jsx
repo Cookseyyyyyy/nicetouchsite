@@ -3,6 +3,8 @@ import * as THREE from 'three';
 import './App.css';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader';
 
+const MAX_LEVEL = 6; // Adjust as needed
+
 function App() {
   const mountRef = useRef(null);
 
@@ -58,16 +60,22 @@ function App() {
     const MAX_VELOCITY = 0.2; // Maximum speed limit
 
     // Minimum spawn distance from existing cubes
-    const MIN_SPAWN_DISTANCE = 2; // Adjust as needed
+    const MIN_SPAWN_DISTANCE = 1.5; // Reduced from 2
+    const MAX_SPAWN_ATTEMPTS = 20; // Increased from 10
 
-    // Maximum attempts to find a valid spawn position
-    const MAX_SPAWN_ATTEMPTS = 10;
-
-    // Helper function to check if the spawn position is valid
+    // Helper function to check if the spawn position is valid - made less restrictive
     const isPositionValid = (position, boxes, minDistance) => {
+      // Check if position is within boundaries first
+      const pos = new THREE.Vector3(...position);
+      if (Math.abs(pos.x) > BOUNDARY || Math.abs(pos.y) > BOUNDARY || Math.abs(pos.z) > BOUNDARY * 0.2) {
+        return false;
+      }
+
+      // Check distance from other boxes with more tolerance
       for (let box of boxes) {
-        const distance = new THREE.Vector3(...position).distanceTo(box.mesh.position);
-        if (distance < minDistance + box.mesh.geometry.parameters.width / 2) {
+        const distance = pos.distanceTo(box.mesh.position);
+        // Reduce the required distance by using a smaller multiplier
+        if (distance < minDistance + box.mesh.geometry.parameters.width * 0.4) { // Reduced from 0.5
           return false;
         }
       }
@@ -79,14 +87,14 @@ function App() {
       constructor(size, position, level = 0, velocity = null) {
         const geometry = new THREE.BoxGeometry(size, size, size);
         const material = new THREE.MeshStandardMaterial({
-          color: 0x808080,
+          color: 0x404040,
           metalness: 0.5,
           roughness: 0.5,
           emissive: 0x000000,
         });
         this.mesh = new THREE.Mesh(geometry, material);
         this.mesh.position.set(...position);
-        this.level = level;
+        this.level = level; // Remove the capping of level
         this.mesh.userData = this;
         scene.add(this.mesh);
 
@@ -122,6 +130,10 @@ function App() {
         // Move the cube
         this.mesh.position.add(this.velocity);
 
+        // Apply damping to the velocity
+        const dampingFactor = 0.98; // Adjust the damping factor as needed (0 < dampingFactor < 1)
+        this.velocity.multiplyScalar(dampingFactor);
+
         // Ensure minimum velocity and limit maximum velocity
         this.velocity = this.limitVelocity(this.velocity);
 
@@ -135,46 +147,62 @@ function App() {
         this.mesh.rotation[this.rotationAxis] += this.rotationSpeed;
       }
 
-      // Method to set emissive color temporarily
-      flashColor(colorHex, duration = 200) {
+      // Method to set emissive color temporarily with smooth fade
+      flashColor(colorHex, duration = 500) {
+        // Set initial color instantly
         this.mesh.material.emissive.setHex(colorHex);
-        setTimeout(() => {
-          this.mesh.material.emissive.setHex(0x000000);
-        }, duration);
+        
+        // Start time for animation
+        const startTime = Date.now();
+        
+        // Animate the fade
+        const fade = () => {
+          const elapsed = Date.now() - startTime;
+          const progress = Math.min(elapsed / duration, 1);
+          
+          // Interpolate color from yellow to black
+          const currentColor = new THREE.Color(colorHex);
+          currentColor.multiplyScalar(1 - progress);
+          this.mesh.material.emissive.copy(currentColor);
+          
+          if (progress < 1) {
+            requestAnimationFrame(fade);
+          }
+        };
+        
+        requestAnimationFrame(fade);
       }
     }
 
     // Initialize boxes with larger size
     const boxes = [
-      new Box(3, [0, 0, 0], 0) // Increased initial size to 3
+      new Box(5, [0, 0, 0], 0) // Start with level 0
     ];
 
-    // Click handler
-    const handleClick = (event) => {
-      // Calculate mouse position in normalized device coordinates
+    // Rename handleClick to handleMouseOver, and call it on mouse move
+    const handleMouseOver = (event) => {
+      // Convert mouse positions to [-1, 1] range
       mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
       mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
-      // Update the picking ray with the camera and mouse position
+      // Cast ray
       raycaster.setFromCamera(mouse, camera);
-
-      // Calculate objects intersecting the picking ray
       const intersects = raycaster.intersectObjects(boxes.map(box => box.mesh));
 
       if (intersects.length > 0) {
-        const clickedMesh = intersects[0].object;
-        const clickedBox = clickedMesh.userData;
+        const hoveredMesh = intersects[0].object;
+        const hoveredBox = hoveredMesh.userData;
 
-        if (clickedBox.level < 4) { // Increased levels (0-4)
-          // Flash yellow
-          clickedBox.flashColor(0xFFFF00);
+        hoveredBox.flashColor(0xFFFF00);
 
-          const spawnCount = Math.floor(Math.random() * 4) + 3; // 3 to 6
-          const newSize = clickedBox.mesh.geometry.parameters.width * 0.65; // Increased spawn size
-          const offset = newSize * 1.5;
-          const newLevel = clickedBox.level + 1;
+        if (hoveredBox.level < MAX_LEVEL) {
+          const spawnCount = Math.floor(Math.random() * 3) + 2;
+          const newSize = hoveredBox.mesh.geometry.parameters.width * 0.7;
+          const offset = newSize * 1.2;
+          const newLevel = hoveredBox.level + 1;
 
-          // Generate random directions for spawning
+          let successfulSpawns = 0;
+
           for (let i = 0; i < spawnCount; i++) {
             const theta = Math.random() * Math.PI * 2;
             const phi = Math.random() * Math.PI;
@@ -184,50 +212,54 @@ function App() {
               Math.cos(phi)
             ).normalize();
 
-            const spawnDistance = offset + Math.random() * offset;
-            let newPos = clickedBox.mesh.position.clone().add(
+            const spawnDistance = offset + Math.random() * offset * 0.5; // Reduced random variation
+            let newPos = hoveredBox.mesh.position.clone().add(
               direction.clone().multiplyScalar(spawnDistance)
             );
 
-            // Check for proximity and adjust if necessary
+            // More systematic position adjustment when initial position is invalid
             let attempts = 0;
             while (!isPositionValid([newPos.x, newPos.y, newPos.z], boxes, MIN_SPAWN_DISTANCE) && attempts < MAX_SPAWN_ATTEMPTS) {
-              // Slightly adjust the position
-              newPos = clickedBox.mesh.position.clone().add(
+              // Try different distances and angles systematically
+              const adjustedDistance = spawnDistance * (1 + (attempts * 0.1));
+              const adjustedTheta = theta + (attempts * Math.PI / 8);
+              const adjustedPhi = phi + (attempts * Math.PI / 8);
+              
+              newPos = hoveredBox.mesh.position.clone().add(
                 new THREE.Vector3(
-                  (Math.random() - 0.5) * 2,
-                  (Math.random() - 0.5) * 2,
-                  (Math.random() - 0.5) * 2
-                ).normalize().multiplyScalar(spawnDistance)
+                  Math.sin(adjustedPhi) * Math.cos(adjustedTheta),
+                  Math.sin(adjustedPhi) * Math.sin(adjustedTheta),
+                  Math.cos(adjustedPhi)
+                ).normalize().multiplyScalar(adjustedDistance)
               );
               attempts++;
             }
 
-            // If a valid position is found, spawn the cube
             if (isPositionValid([newPos.x, newPos.y, newPos.z], boxes, MIN_SPAWN_DISTANCE)) {
-              // Randomize spawn velocity with speed limit
-              const initialSpeed = 0.05 + Math.random() * 0.15; // Adjusted speed range
+              const initialSpeed = 0.03 + Math.random() * 0.1; // Reduced initial velocity
               const initialVelocity = direction.clone().multiplyScalar(initialSpeed);
               const newBox = new Box(newSize, [newPos.x, newPos.y, newPos.z], newLevel, initialVelocity);
               newBox.flashColor(0xFFFF00);
               boxes.push(newBox);
-            } else {
-              console.warn('Could not find a valid spawn position after maximum attempts.');
+              successfulSpawns++;
             }
           }
 
-          // Remove the clicked box
-          scene.remove(clickedBox.mesh);
-          const index = boxes.indexOf(clickedBox);
-          if (index > -1) {
-            boxes.splice(index, 1);
+          if (successfulSpawns > 0) {
+            scene.remove(hoveredBox.mesh);
+            const index = boxes.indexOf(hoveredBox);
+            if (index > -1) {
+              boxes.splice(index, 1);
+            }
           }
+        } else {
+          console.log('Max level reached, box will not be removed.');
         }
       }
     };
 
-    // Add event listener to renderer's DOM element
-    renderer.domElement.addEventListener('click', handleClick);
+    // Attach mouse move event instead of click
+    renderer.domElement.addEventListener('mousemove', handleMouseOver);
 
     // Animation loop
     const animate = () => {
@@ -247,15 +279,25 @@ function App() {
 
           if (distance < minDistance) {
             const normal = boxA.mesh.position.clone().sub(boxB.mesh.position).normalize();
+            const overlap = minDistance - distance;
+
+            // Separate the boxes to prevent sticking
+            const correction = normal.clone().multiplyScalar(overlap / 2);
+            boxA.mesh.position.add(correction);
+            boxB.mesh.position.sub(correction);
+
             const relativeVelocity = boxA.velocity.clone().sub(boxB.velocity);
             const speed = relativeVelocity.dot(normal);
 
-            if (speed < 0) continue; // Prevent double collision
+            if (speed < 0) { // Only proceed if boxes are moving towards each other
+              const impulse = normal.clone().multiplyScalar(-speed * 1.05); // Slightly increase speed to avoid sticking
+              boxA.velocity.add(impulse);
+              boxB.velocity.sub(impulse);
 
-            const impulse = normal.clone().multiplyScalar(speed * 1.05); // Slightly increase speed to avoid sticking
-
-            boxA.velocity = boxA.limitVelocity(boxA.velocity.sub(impulse));
-            boxB.velocity = boxB.limitVelocity(boxB.velocity.add(impulse));
+              // Limit velocities after collision
+              boxA.velocity = boxA.limitVelocity(boxA.velocity);
+              boxB.velocity = boxB.limitVelocity(boxB.velocity);
+            }
           }
         }
       }
@@ -264,13 +306,14 @@ function App() {
       boxes.forEach(box => {
         ['x', 'y', 'z'].forEach((axis) => {
           const halfSize = box.mesh.geometry.parameters.width / 2;
-          if (box.mesh.position[axis] + halfSize > BOUNDARY) {
-            box.mesh.position[axis] = BOUNDARY - halfSize;
+          const boundaryForAxis = axis === 'z' ? BOUNDARY * 0.2 : BOUNDARY;
+          if (box.mesh.position[axis] + halfSize > boundaryForAxis) {
+            box.mesh.position[axis] = boundaryForAxis - halfSize;
             box.velocity[axis] *= -1;
             box.velocity = box.limitVelocity(box.velocity);
           }
-          if (box.mesh.position[axis] - halfSize < -BOUNDARY) {
-            box.mesh.position[axis] = -BOUNDARY + halfSize;
+          if (box.mesh.position[axis] - halfSize < -boundaryForAxis) {
+            box.mesh.position[axis] = -boundaryForAxis + halfSize;
             box.velocity[axis] *= -1;
             box.velocity = box.limitVelocity(box.velocity);
           }
@@ -293,7 +336,7 @@ function App() {
 
     // Cleanup on unmount
     return () => {
-      renderer.domElement.removeEventListener('click', handleClick);
+      renderer.domElement.removeEventListener('mousemove', handleMouseOver);
       window.removeEventListener('resize', handleResize);
       mountRef.current.removeChild(renderer.domElement);
     };
