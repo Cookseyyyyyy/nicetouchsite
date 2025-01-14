@@ -176,7 +176,9 @@ function App() {
 
     // Initialize boxes with larger size
     const boxes = [
-      new Box(5, [0, 0, 0], 0) // Start with level 0
+      new Box(5, [-6, 0, 0], 0),  // Left box
+      new Box(5, [6, 0, 0], 0),   // Right box
+      new Box(5, [0, 6, 0], 0)    // Top box
     ];
 
     // Rename handleClick to handleMouseOver, and call it on mouse move
@@ -355,9 +357,9 @@ function App() {
         const distanceY = e.clientY - letterY;
         const distance = Math.sqrt(distanceX * distanceX + distanceY * distanceY);
 
-        if (distance < 100) { // Repulsion radius
+        if (distance < 300) { // Increased repulsion radius
           const angle = Math.atan2(distanceY, distanceX);
-          const force = (100 - distance) / 5;
+          const force = (200 - distance) / 3; // Increased force factor
           const moveX = -Math.cos(angle) * force;
           const moveY = -Math.sin(angle) * force;
 
@@ -379,7 +381,7 @@ function App() {
     <div id="mount" ref={mountRef}>
       <div className="overlay">
         <h1 className="title">
-          {'NICE TOUCH'.split('').map((char, i) => (
+          {'NICE   TOUCH'.split('').map((char, i) => (
             <span key={i} className="letter">
               {char}
             </span>
