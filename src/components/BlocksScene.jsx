@@ -4,10 +4,19 @@ import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader';
 
 const MAX_LEVEL = 6;
 const BOUNDARY = 20;
+const CONNECTION_RADIUS = 5;
+const LINE_COLOR = 0xffffff;
 const MIN_VELOCITY = 0.005;
 const MAX_VELOCITY = 0.2;
 const MIN_SPAWN_DISTANCE = 1.5;
 const MAX_SPAWN_ATTEMPTS = 20;
+
+// Create a single reusable geometry and material outside the component
+const lineMaterial = new THREE.LineBasicMaterial({ 
+  color: LINE_COLOR,
+  transparent: true,
+  opacity: 0.3
+});
 
 export default function BlocksScene() {
   const mountRef = useRef(null);
@@ -75,7 +84,7 @@ export default function BlocksScene() {
       constructor(size, position, level = 0, velocity = null) {
         const geometry = new THREE.BoxGeometry(size, size, size);
         const material = new THREE.MeshStandardMaterial({
-          color: 0x404040,
+          color: 0x202020,
           metalness: 0.5,
           roughness: 0.5,
           emissive: 0x000000,
@@ -228,11 +237,61 @@ export default function BlocksScene() {
 
     renderer.domElement.addEventListener('mousemove', handleMouseOver);
 
+    // Create a dynamic line mesh
+    const positions = new Float32Array(1000 * 2 * 3); // Start with space for 1000 lines
+    const lineGeometry = new THREE.BufferGeometry();
+    lineGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    const lineMesh = new THREE.LineSegments(lineGeometry, lineMaterial);
+    scene.add(lineMesh);
+
+    // Function to update connections
+    const updateConnections = (boxes) => {
+      let lineCount = 0;
+      let positions = lineMesh.geometry.attributes.position.array;
+
+      // Resize buffer if needed
+      const neededSize = boxes.length * boxes.length * 3 * 2;
+      if (positions.length < neededSize) {
+        positions = new Float32Array(neededSize);
+        lineGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      }
+
+      for (let i = 0; i < boxes.length; i++) {
+        for (let j = i + 1; j < boxes.length; j++) {
+          const boxA = boxes[i];
+          const boxB = boxes[j];
+
+          const distance = boxA.mesh.position.distanceTo(boxB.mesh.position);
+
+          if (distance <= CONNECTION_RADIUS) {
+            const index = lineCount * 6;
+            
+            positions[index] = boxA.mesh.position.x;
+            positions[index + 1] = boxA.mesh.position.y;
+            positions[index + 2] = boxA.mesh.position.z;
+            
+            positions[index + 3] = boxB.mesh.position.x;
+            positions[index + 4] = boxB.mesh.position.y;
+            positions[index + 5] = boxB.mesh.position.z;
+
+            lineCount++;
+          }
+        }
+      }
+
+      // Update the geometry to only show active lines
+      lineGeometry.setDrawRange(0, lineCount * 2);
+      lineMesh.geometry.attributes.position.needsUpdate = true;
+    };
+
     // Animation loop
     const animate = () => {
       requestAnimationFrame(animate);
 
       boxes.forEach(box => box.update());
+
+      // Update connection lines
+      updateConnections(boxes);
 
       // Handle collisions between cubes
       for (let i = 0; i < boxes.length; i++) {
@@ -302,6 +361,8 @@ export default function BlocksScene() {
       renderer.domElement.removeEventListener('mousemove', handleMouseOver);
       window.removeEventListener('resize', handleResize);
       mountRef.current?.removeChild(renderer.domElement);
+      scene.remove(lineMesh);
+      lineGeometry.dispose();
     };
   }, []);
 

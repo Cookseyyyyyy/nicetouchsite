@@ -29,10 +29,15 @@ function App() {
           const force = (200 - distance) / 3;
           const moveX = -Math.cos(angle) * force;
           const moveY = -Math.sin(angle) * force;
-
-          letter.style.transform = `translate(${moveX}px, ${moveY}px)`;
+          
+          // Calculate rotation based on displacement
+          const rotationForce = (force / 200) * 45; // Max 45 degrees rotation
+          const randomDirection = letter.dataset.rotationDir || (Math.random() > 0.5 ? 1 : -1);
+          letter.dataset.rotationDir = randomDirection;
+          
+          letter.style.transform = `translate(${moveX}px, ${moveY}px) rotate(${rotationForce * randomDirection}deg)`;
         } else {
-          letter.style.transform = 'translate(0, 0)';
+          letter.style.transform = 'translate(0, 0) rotate(0deg)';
         }
       });
     };
@@ -60,17 +65,17 @@ function App() {
           <AnimatedButton
             defaultText={buttonTexts.youtube.default}
             hoverText={buttonTexts.youtube.hover}
-            onClick={() => window.open('https://youtube.com/YOUR_CHANNEL', '_blank')}
+            onClick={() => window.open('https://www.youtube.com/@NiceTouch318', '_blank')}
           />
           <AnimatedButton
             defaultText={buttonTexts.discord.default}
             hoverText={buttonTexts.discord.hover}
-            onClick={() => window.open('https://discord.gg/YOUR_SERVER', '_blank')}
+            onClick={() => window.open('https://discord.gg/jpp3mQUCYN', '_blank')}
           />
           <AnimatedButton
             defaultText={buttonTexts.gumroad.default}
             hoverText={buttonTexts.gumroad.hover}
-            onClick={() => window.open('https://gumroad.com/YOUR_PAGE', '_blank')}
+            onClick={() => window.open('https://thatsanicetouch.gumroad.com/', '_blank')}
           />
         </div>
       </div>
