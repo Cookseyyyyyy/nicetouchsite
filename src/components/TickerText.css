@@ -1,0 +1,37 @@
+.ticker-container {
+  width: 100%;
+  background-color: #FFFF00;
+  overflow: hidden;
+  position: absolute;
+  top: 0%;
+  display: flex;
+  align-items: center;
+}
+
+.ticker {
+  width: 100%;
+  height: fit-content;
+  overflow: hidden;
+  line-height: 1;
+}
+
+.ticker-content {
+  display: inline-block;
+  white-space: nowrap;
+  padding-left: 0;
+  color: #000000;
+  font-size: 32px;
+  letter-spacing: 1px;
+  animation: ticker 120s linear infinite;
+  font-family: 'Poppins', sans-serif;
+  font-weight: bold;
+}
+
+@keyframes ticker {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-100%, 0, 0);
+  }
+}

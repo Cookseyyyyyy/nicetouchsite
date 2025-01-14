@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import './App.css';
 import BlocksScene from './components/BlocksScene';
 import AnimatedButton from './components/Animatedbutton';
+import TickerText from './components/TickerText';
 
 function App() {
   const [buttonTexts] = useState({
@@ -54,6 +55,7 @@ function App() {
             </span>
           ))}
         </h1>
+        <TickerText />
         <div className="buttons">
           <AnimatedButton
             defaultText={buttonTexts.youtube.default}
