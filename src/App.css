@@ -52,21 +52,25 @@ body, html, #root {
   position: absolute;
   bottom: 20px;
   display: flex;
-  gap: 10px;
+  gap: 1rem;
+  transition: gap 0.45s cubic-bezier(0.4, 0, 0.2, 1);
   pointer-events: auto;
 }
 
-button {
+.buttons button {
+  display: inline-block;
+  white-space: nowrap;
+  padding: 0.8rem 1.5rem;
   background-color: transparent;
   border: 2px solid #FFFF00;
   color: #FFFF00;
-  padding: 12px 24px;
   font-size: 1rem;
   cursor: pointer;
-  transition: all 0.3s ease;
+  overflow: hidden;
+  transition: all 0.45s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-button:hover {
+.buttons button:hover {
   background-color: #FFFF00;
   color: black;
 }

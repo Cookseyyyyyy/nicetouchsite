@@ -1,12 +1,18 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import './App.css';
+import AnimatedButton from './AnimatedButton';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader';
 
 const MAX_LEVEL = 6; // Adjust as needed
 
 function App() {
   const mountRef = useRef(null);
+  const [buttonTexts] = useState({
+    youtube: { default: 'Youtube', hover: 'See what we do and how we do it.' },
+    discord: { default: 'Discord', hover: 'Join the community and chat with us!' },
+    gumroad: { default: 'Gumroad', hover: 'Free plugins, assets and more.' }
+  });
 
   useEffect(() => {
     // Scene setup
@@ -388,9 +394,21 @@ function App() {
           ))}
         </h1>
         <div className="buttons">
-          <button onClick={() => window.open('https://youtube.com/YOUR_CHANNEL', '_blank')}>Youtube</button>
-          <button onClick={() => window.open('https://discord.gg/YOUR_SERVER', '_blank')}>Discord</button>
-          <button onClick={() => window.open('https://gumroad.com/YOUR_PAGE', '_blank')}>Gumroad</button>
+          <AnimatedButton
+            defaultText={buttonTexts.youtube.default}
+            hoverText={buttonTexts.youtube.hover}
+            onClick={() => window.open('https://youtube.com/YOUR_CHANNEL', '_blank')}
+          />
+          <AnimatedButton
+            defaultText={buttonTexts.discord.default}
+            hoverText={buttonTexts.discord.hover}
+            onClick={() => window.open('https://discord.gg/YOUR_SERVER', '_blank')}
+          />
+          <AnimatedButton
+            defaultText={buttonTexts.gumroad.default}
+            hoverText={buttonTexts.gumroad.hover}
+            onClick={() => window.open('https://gumroad.com/YOUR_PAGE', '_blank')}
+          />
         </div>
       </div>
     </div>
